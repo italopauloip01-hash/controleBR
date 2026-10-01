@@ -10,8 +10,12 @@ export const formatCurrency = (value: number) => {
  * evitando o bug de deslocamento de um dia causado pela conversão UTC→local.
  * Use sempre que for exibir ou converter datas vindas do banco de dados.
  */
-export const parseDateLocal = (dateStr: string): Date => {
-    const [year, month, day] = dateStr.split('-').map(Number);
+export const parseDateLocal = (dateStr?: string | null): Date => {
+    if (!dateStr || typeof dateStr !== 'string') return new Date(NaN);
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return new Date(NaN);
+    const [year, month, day] = parts.map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return new Date(NaN);
     return new Date(year, month - 1, day);
 };
 

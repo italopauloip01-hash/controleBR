@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, User, Target, ArrowRight, Wallet, ShieldCheck, Eye, EyeOff } from 'lucide-react';
@@ -18,8 +18,7 @@ export default function Login() {
 
     // Se já está logado, redireciona imediatamente
     if (user) {
-        navigate('/', { replace: true });
-        return null;
+        return <Navigate to="/" replace />;
     }
 
     const handleSubmit = async (e: React.FormEvent) => {

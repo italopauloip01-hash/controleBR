@@ -26,7 +26,8 @@ export default function Dashboard() {
         const start = startOfMonth(date);
         const end = endOfMonth(date);
         
-        const currentTxs = transactions.filter(t => {
+        const currentTxs = (transactions || []).filter(t => {
+            if (!t || !t.date) return false;
             const tDate = parseDateLocal(t.date);
             if (isNaN(tDate.getTime())) return false;
             return isWithinInterval(tDate, { start, end });
@@ -62,7 +63,11 @@ export default function Dashboard() {
 
     const { projectedBalance, pendingIncome, pendingExpense } = useMemo(() => {
         const todayStr = todayLocalISO();
-        const transactionsUpToCurrentMonth = transactions.filter(t => parseDateLocal(t.date) <= currentMonthEnd);
+        const transactionsUpToCurrentMonth = (transactions || []).filter(t => {
+            if (!t || !t.date) return false;
+            const d = parseDateLocal(t.date);
+            return !isNaN(d.getTime()) && d <= currentMonthEnd;
+        });
 
         let pIncome = 0;
         let pExpense = 0;
@@ -256,7 +261,7 @@ export default function Dashboard() {
                                 </ResponsiveContainer>
 
                                 <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center pointer-events-none px-6 w-3/4">
-                                    {activeIndex !== -1 ? (
+                                    {activeIndex !== -1 && chartData[activeIndex] ? (
                                         <div className="animate-in fade-in zoom-in duration-300 w-full">
                                             <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] truncate w-full">{chartData[activeIndex].name}</p>
                                             <p className="text-xl md:text-2xl font-black text-[var(--text-primary)] truncate w-full">{formatCurrency(chartData[activeIndex].value)}</p>

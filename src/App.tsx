@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import UpdateBanner from './components/UpdateBanner';
@@ -98,23 +99,25 @@ function App() {
   }, []);
 
   return (
-    <NotificationProvider>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </NotificationProvider>
+    <ErrorBoundary>
+      <NotificationProvider>
+        <AuthProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <MainLayout />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </NotificationProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -12,6 +12,7 @@ import {
     Eye, EyeOff
 } from 'lucide-react';
 import { UpdatePlugin } from '../utils/updatePlugin';
+import { APP_VERSION, APP_BUILD_DATE } from '../version';
 
 export default function Configuracoes() {
     const { user } = useAuth();
@@ -20,7 +21,7 @@ export default function Configuracoes() {
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'export' | 'update'>('profile');
 
     const [isSaving, setIsSaving] = useState(false);
-    const [appVersion, setAppVersion] = useState('Buscando...');
+    const [appVersion, setAppVersion] = useState(`v${APP_VERSION} (Web)`);
 
     // Security Toggle
     const [showPassword, setShowPassword] = useState(false);
@@ -33,10 +34,10 @@ export default function Configuracoes() {
                     const info = await UpdatePlugin.getAppVersion();
                     setAppVersion(`v${info.versionName} (Build ${info.versionCode})`);
                 } else {
-                    setAppVersion('v1.9.0 (Preview Web)');
+                    setAppVersion(`v${APP_VERSION} (Web • ${APP_BUILD_DATE})`);
                 }
             } catch (e) {
-                setAppVersion('v1.9.0 (Web/Sync Error)');
+                setAppVersion(`v${APP_VERSION} (Web)`);
             }
         };
         checkVersion();
@@ -226,7 +227,7 @@ export default function Configuracoes() {
                             Versão Instalada
                         </p>
                         <p className="text-xs font-black text-indigo-500 mt-1.5 bg-indigo-500/5 py-1 px-3 rounded-full inline-block">
-                            v{appVersion}
+                            {appVersion}
                         </p>
                     </div>
                 </div>
@@ -405,7 +406,7 @@ export default function Configuracoes() {
                                                 <Smartphone size={28} />
                                             </div>
                                             <div>
-                                                <h4 className="font-black text-lg tracking-tight text-[var(--text-primary)]">Versão Local: v{appVersion}</h4>
+                                                <h4 className="font-black text-lg tracking-tight text-[var(--text-primary)]">Versão Local: {appVersion}</h4>
                                                 <p className="text-xs font-bold text-[var(--text-secondary)]">Plataforma Híbrida Capacitor</p>
                                             </div>
                                         </div>

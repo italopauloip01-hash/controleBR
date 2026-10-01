@@ -1,11 +1,13 @@
 {
   "name": "controle-financeiro",
   "private": true,
-  "version": "1.9.0",
+  "version": "1.9.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "bump": "node scripts/bump-version.js",
+    "ship": "node scripts/bump-version.js && git add -A && git commit -m \"release: nova versao\" && git push origin main",
     "build:android": "npm run build && npx cap sync",
     "open:android": "npx cap open android",
     "lint": "eslint .",

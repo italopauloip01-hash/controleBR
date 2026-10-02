@@ -132,7 +132,9 @@ export default function Dashboard() {
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             {greeting.icon}
-                            <span className="text-[var(--text-secondary)] text-sm font-bold uppercase tracking-widest">{greeting.text}, {firstName}</span>
+                            <span className="text-[var(--text-secondary)] text-sm font-bold uppercase tracking-widest flex items-center gap-1">
+                                <span>{greeting.text}</span>, <span>{firstName}</span>
+                            </span>
                         </div>
                         <h1 className="text-3xl font-black text-[var(--text-primary)] tracking-tight leading-tight">Painel de Controle</h1>
                     </div>

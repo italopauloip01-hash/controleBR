@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { inferCategoryName, isCarRelated } from '../utils/categoriesMap';
 import { formatCurrencyInput, parseCurrencyToFloat } from '../utils/currencyMask';
 import { useNotification } from '../context/NotificationContext';
-import { todayLocalISO } from '../utils/format';
-import { TrendingDown, CreditCard, Landmark, Calendar, Repeat, CheckCircle2, Car, Fuel, Map } from 'lucide-react';
+import { TrendingDown, CreditCard, Landmark, Calendar, Repeat, CheckCircle2, Car, Fuel, Map, RotateCcw, AlertTriangle } from 'lucide-react';
+import { type FuelType, FUEL_TYPES, detectFuelType, hasResetCycleTag, buildFuelDescription, cleanFuelDescription } from '../utils/fuelUtils';
 
 interface ExpenseFormProps {
     onSuccess?: () => void;
@@ -18,7 +18,9 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
     const { user } = useAuth();
     const { showToast } = useNotification();
 
-    const [description, setDescription] = useState(initialData?.description || '');
+    const [description, setDescription] = useState(initialData?.description ? cleanFuelDescription(initialData.description) : '');
+    const [fuelType, setFuelType] = useState<FuelType>(() => detectFuelType(initialData?.description));
+    const [isResetCycle, setIsResetCycle] = useState<boolean>(() => hasResetCycleTag(initialData?.description));
     const [amount, setAmount] = useState(initialData?.amount !== undefined && initialData?.amount !== null ? formatCurrencyInput((initialData.amount * 100).toFixed(0)) : '');
     const [date, setDate] = useState(initialData?.date ? initialData.date.split('T')[0] : todayLocalISO());
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,8 +141,12 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                 }
             }
 
+            const finalDescription = (isCarExpense && (vehicleId || mileage || liters || isFuelRelated(description, suggestedName)))
+                ? buildFuelDescription(description, fuelType, isResetCycle)
+                : description;
+
             const payload = {
-                description,
+                description: finalDescription,
                 amount: initialData ? floatAmount : installmentAmount,
                 date,
                 type: initialData ? initialData.type : 'expense',
@@ -168,6 +174,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
             setPaymentMethod(''); setAccountId(''); setCreditCardId('');
             setIsPaid(true); setIsFixed(false); setFixedEndDate('');
             setInstallments('1'); setVehicleId(''); setMileage(''); setLiters('');
+            setFuelType('gasolina'); setIsResetCycle(false);
 
             showToast(initialData ? 'Saída de recursos atualizada!' : 'Valor descontado com sucesso!', 'success');
             await refreshData();
@@ -209,8 +216,19 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                         type="text"
                         value={description}
                         onChange={(e) => {
-                            setDescription(e.target.value);
+                            const val = e.target.value;
+                            setDescription(val);
                             setShowSuggestions(true);
+                            const lower = val.toLowerCase();
+                            if (lower.includes('etanol') || lower.includes('álcool') || lower.includes('alcool')) {
+                                setFuelType('etanol');
+                            } else if (lower.includes('diesel')) {
+                                setFuelType('diesel');
+                            } else if (lower.includes('gnv')) {
+                                setFuelType('gnv');
+                            } else if (lower.includes('gasolina')) {
+                                setFuelType('gasolina');
+                            }
                         }}
                         onFocus={() => setShowSuggestions(true)}
                         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
@@ -371,9 +389,14 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                             <Car size={150} />
                         </div>
                         
-                        <div className="flex items-center gap-2 mb-4 relative z-10">
-                            <Car size={18} className="text-[var(--color-carro)]" />
-                            <span className="font-black text-[var(--color-carro)] tracking-tight uppercase">Automação de Frota</span>
+                        <div className="flex items-center justify-between gap-2 mb-4 relative z-10">
+                            <div className="flex items-center gap-2">
+                                <Car size={18} className="text-[var(--color-carro)]" />
+                                <span className="font-black text-[var(--color-carro)] tracking-tight uppercase text-sm">Automação de Frota</span>
+                            </div>
+                            <span className="text-[10px] bg-[var(--bg-card)] border border-[var(--border-color)] px-2.5 py-1 rounded-full font-bold text-[var(--text-secondary)] uppercase">
+                                Controle Flex & Médias
+                            </span>
                         </div>
                         
                         <div className="grid grid-cols-1 gap-4 relative z-10">
@@ -393,10 +416,38 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                 </div>
                             )}
 
+                            {/* Seletor de Tipo de Combustível */}
+                            <div>
+                                <label className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--color-carro)] uppercase tracking-widest mb-1.5 px-1">
+                                    <Fuel size={12}/> Tipo de Combustível Utilizado
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {(['gasolina', 'etanol', 'diesel', 'gnv'] as FuelType[]).map((type) => {
+                                        const config = FUEL_TYPES[type];
+                                        const isSelected = fuelType === type;
+                                        return (
+                                            <button
+                                                key={type}
+                                                type="button"
+                                                onClick={() => setFuelType(type)}
+                                                className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border-2 transition-all cursor-pointer ${
+                                                    isSelected
+                                                        ? 'bg-[var(--color-carro)] text-white border-[var(--color-carro)] shadow-md shadow-[var(--color-carro)]/20 scale-[1.02]'
+                                                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[var(--color-carro)]/40 hover:text-[var(--text-primary)]'
+                                                }`}
+                                            >
+                                                <span>{config.icon}</span>
+                                                <span>{config.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--color-carro)] uppercase tracking-widest mb-1.5 px-1">
-                                        <Map size={12}/> KM Atual
+                                        <Map size={12}/> KM Atual (Odômetro)
                                     </label>
                                     <input
                                         type="number" min="0" step="0.1"
@@ -408,7 +459,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                 </div>
                                 <div>
                                     <label className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--color-carro)] uppercase tracking-widest mb-1.5 px-1">
-                                        <Fuel size={12}/> Combustível
+                                        <Fuel size={12}/> Volume Abastecido
                                     </label>
                                     <input
                                         type="number" min="0" step="0.01"
@@ -418,6 +469,31 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                         placeholder="Litros Ex: 40"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Reset / Novo Ciclo de Média */}
+                            <div className="pt-2 border-t border-[var(--color-carro)]/15">
+                                <label className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                                    isResetCycle
+                                        ? 'bg-amber-500/10 border-amber-500/30 text-[var(--text-primary)]'
+                                        : 'bg-[var(--bg-card)]/50 border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-card)]'
+                                }`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isResetCycle}
+                                        onChange={(e) => setIsResetCycle(e.target.checked)}
+                                        className="w-4 h-4 mt-0.5 text-amber-500 rounded border-[var(--border-color)] focus:ring-0 cursor-pointer"
+                                    />
+                                    <div className="flex-1 text-xs">
+                                        <div className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
+                                            <RotateCcw size={13} className={isResetCycle ? 'text-amber-500' : 'text-[var(--text-muted)]'} />
+                                            <span>Reiniciar ciclo de média (odômetro saltou ou esqueci registros)</span>
+                                        </div>
+                                        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-snug">
+                                            Marque se houve um intervalo grande ou abastecimentos que não foram anotados. Isso evita que o cálculo gere uma média irreal (ex: 50 km/l).
+                                        </p>
+                                    </div>
+                                </label>
                             </div>
                         </div>
                     </div>

@@ -39,7 +39,7 @@ export function inferCategoryName(description: string, type: 'expense' | 'revenu
 }
 
 
-export const FUEL_KEYWORDS = ['posto', 'gasolina', 'etanol', 'diesel', 'gnv', 'abastecimento', 'combustivel', 'combustível'];
+export const FUEL_KEYWORDS = ['posto', 'gasolina', 'etanol', 'álcool', 'alcool', 'diesel', 'gnv', 'abastecimento', 'combustivel', 'combustível'];
 export const VEHICLE_MAINTENANCE_KEYWORDS = ['mecanic', 'mecânic', 'carro', 'veiculo', 'veículo', 'manutenc', 'manutenç', 'oficina', 'pneu', 'óleo', 'oleo', 'ipva', 'seguro auto', 'moto', 'lavar', 'lava jato', 'pedagio', 'pedágio', 'estacionamento', 'multa'];
 
 export function isCarRelated(description: string, categoryName: string = ''): boolean {

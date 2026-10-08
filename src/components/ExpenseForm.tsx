@@ -295,6 +295,7 @@ export default function ExpenseForm({ onSuccess, initialData, fuelPrefill }: Exp
                 </div>
                 <FuelPhotoButton
                     onResult={(reading) => applyFuelReading(reading)}
+                    vehicleId={vehicleId}
                     label="Abastecimento por foto"
                     className="px-3 py-2.5 text-xs rounded-xl bg-[var(--color-carro)]/10 text-[var(--color-carro)] border-2 border-[var(--color-carro)]/30 hover:bg-[var(--color-carro)]/20"
                 />

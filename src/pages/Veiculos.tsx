@@ -203,6 +203,7 @@ export default function Veiculos() {
 
                         <FuelPhotoButton
                             onResult={(reading) => setPhotoPrefill({ reading, vehicleId: selectedVehicleId })}
+                            vehicleId={selectedVehicleId}
                             label="Foto"
                             className="p-3 bg-[var(--color-carro)] text-white rounded-xl shadow-sm hover:opacity-90 [&>span]:hidden sm:[&>span]:block"
                         />

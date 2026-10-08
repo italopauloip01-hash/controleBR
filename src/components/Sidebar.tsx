@@ -13,7 +13,9 @@ import {
     Award,
     Tags,
     Car,
-    FileText
+    FileText,
+    FileUp,
+    FileBarChart
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -30,6 +32,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { path: '/receitas', icon: TrendingUp, label: 'Receitas' },
         { path: '/despesas', icon: TrendingDown, label: 'Despesas' },
         { path: '/extrato', icon: FileText, label: 'Extrato' },
+        { path: '/importar', icon: FileUp, label: 'Importar Extrato' },
+        { path: '/relatorio', icon: FileBarChart, label: 'Relatório Mensal' },
         { path: '/veiculos', icon: Car, label: 'Veículos' },
         { path: '/contas', icon: WalletCards, label: 'Contas' },
         { path: '/cartoes', icon: CreditCard, label: 'Cartões' },

@@ -544,3 +544,23 @@ select.input-field {
   border: 1px solid var(--border-color);
   animation: modal-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Impressão / Salvar como PDF (Relatório mensal): só o conteúdo, fundo branco */
+@media print {
+  @page { margin: 12mm; }
+  .sidebar, .no-print { display: none !important; }
+  html, body, .app-container, .main-content {
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+  }
+  .print-area, .print-area * {
+    color: #111 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .print-area .print-card { border: 1px solid #ccc !important; break-inside: avoid; }
+  .print-area .print-bar { background: #555 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

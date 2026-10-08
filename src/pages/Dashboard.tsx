@@ -3,8 +3,10 @@ import { useFinance } from '../context/FinanceContext';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
 import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear } from 'date-fns';
-import { Wallet, TrendingUp, TrendingDown, Target, Zap, User, Sun, Moon, Sunrise, PieChart as PieChartIcon, Clock } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Target, Zap, User, Sun, Moon, Sunrise, PieChart as PieChartIcon, Clock, Gauge } from 'lucide-react';
 import PeriodFilter from '../components/PeriodFilter';
+import BudgetCard from '../components/BudgetCard';
+import MaintenanceAlerts from '../components/MaintenanceAlerts';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency, parseDateLocal, todayLocalISO } from '../utils/format';
 import { Link } from 'react-router-dom';
@@ -86,6 +88,23 @@ export default function Dashboard() {
         };
     }, [transactions, currentMonthEnd, totalBalance]);
 
+    // Ritmo de gastos: quanto ainda deve sair até o fim do mês se o padrão diário continuar.
+    // Considera só gastos variáveis que saem do saldo (sem fixos, parcelados e cartão de crédito).
+    const spendingPace = useMemo(() => {
+        const now = new Date();
+        if (now.getMonth() !== selectedMonth || now.getFullYear() !== selectedYear) return null;
+        const day = now.getDate();
+        const remainingDays = currentMonthEnd.getDate() - day;
+        const today = todayLocalISO();
+        const variableSpent = currentMonthTransactions
+            .filter(t => t.type === 'expense' && !t.is_fixed && (t.installments || 1) <= 1 && t.payment_method !== 'cartao_credito' && t.date <= today)
+            .reduce((sum, t) => sum + t.amount, 0);
+        if (day < 3 || variableSpent <= 0 || remainingDays <= 0) return null;
+        const perDay = variableSpent / day;
+        const extra = perDay * remainingDays;
+        return { perDay, extra, remainingDays, finalBalance: projectedBalance - extra };
+    }, [selectedMonth, selectedYear, currentMonthEnd, currentMonthTransactions, projectedBalance]);
+
     const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#06b6d4', '#8b5cf6', '#ec4899', '#14b8a6'];
 
     const [activeIndex, setActiveIndex] = useState(-1);
@@ -142,6 +161,8 @@ export default function Dashboard() {
                     <PeriodFilter />
                 </div>
             </div>
+
+            <MaintenanceAlerts />
 
             {/* Sumário Financeiro Estilizado (Invertido: Gasto Primeiro) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -219,7 +240,27 @@ export default function Dashboard() {
                         </p>
                     </div>
                 </div>
+
+                {spendingPace && (
+                    <div className="mt-4 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                            <Gauge size={18} className="text-indigo-400 mt-0.5 shrink-0" />
+                            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                                Você gasta em média <strong className="text-[var(--text-primary)]">{formatCurrency(spendingPace.perDay)}/dia</strong> em gastos do dia a dia.
+                                Nesse ritmo, saem mais <strong className="text-[var(--color-despesa)]">~{formatCurrency(spendingPace.extra)}</strong> nos próximos {spendingPace.remainingDays} dias.
+                            </p>
+                        </div>
+                        <div className="sm:text-right shrink-0">
+                            <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest">No ritmo atual</p>
+                            <p className={`text-xl font-black ${spendingPace.finalBalance >= 0 ? 'text-[var(--text-primary)]' : 'text-rose-500'}`}>
+                                {formatCurrency(spendingPace.finalBalance)}
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            <BudgetCard />
 
             {/* Bottom Section - Chart & History */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">

@@ -9,6 +9,9 @@ import { isCarRelated, isFuelRelated } from '../utils/categoriesMap';
 import VehicleForm from '../components/VehicleForm';
 import ExpenseForm, { type FuelPrefill } from '../components/ExpenseForm';
 import FuelPhotoButton from '../components/FuelPhotoButton';
+import VehicleCharts from '../components/VehicleCharts';
+import VehicleMaintenance from '../components/VehicleMaintenance';
+import { currentKmByVehicle } from '../utils/maintenance';
 import { calculateFuelMetrics, FUEL_TYPES, detectFuelType, cleanFuelDescription, type FuelSegmentCalculation } from '../utils/fuelUtils';
 
 // Abastecimento = descrição (sem tags automáticas) fala de combustível OU há litros registrados.
@@ -146,7 +149,12 @@ export default function Veiculos() {
     const lastRefuelingAvg = fuelStats.ultimoAbastecimento ? fuelStats.ultimoAbastecimento.kmPorLitro : 0;
 
 
-    const activeVehicleName = selectedVehicleId === 'all' 
+    const kmByVehicle = useMemo(() => currentKmByVehicle(transactions), [transactions]);
+    const maintenanceVehicle = selectedVehicleId !== 'all'
+        ? vehicles.find(v => v.id === selectedVehicleId)
+        : (vehicles.length === 1 ? vehicles[0] : undefined);
+
+    const activeVehicleName = selectedVehicleId === 'all'
         ? 'Todos os Veículos' 
         : vehicles.find(v => v.id === selectedVehicleId)?.name || 'Veículo';
 
@@ -470,6 +478,22 @@ export default function Veiculos() {
                     </div>
                 </div>
             </div>
+
+            {/* Evolução do consumo e do preço do litro */}
+            <VehicleCharts fuelTransactions={fuelTransactionsSorted} segmentMap={segmentMap} />
+
+            {/* Lembretes de manutenção por KM (um veículo por vez) */}
+            {maintenanceVehicle ? (
+                <VehicleMaintenance
+                    vehicleId={maintenanceVehicle.id}
+                    vehicleName={maintenanceVehicle.name}
+                    currentKm={kmByVehicle[maintenanceVehicle.id] || 0}
+                />
+            ) : vehicles.length > 1 && (
+                <p className="text-xs text-[var(--text-secondary)] text-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-4">
+                    Selecione um veículo no topo para ver os lembretes de manutenção por KM.
+                </p>
+            )}
 
             {/* Informative Note */}
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl p-5 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow">

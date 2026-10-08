@@ -3,7 +3,7 @@ import { LayoutDashboard, FileText, TrendingUp, TrendingDown, Car } from 'lucide
 
 export default function BottomNav() {
     return (
-        <div className="md:hidden fixed bottom-0 left-0 w-full bg-[var(--bg-card)] border-t border-[var(--border-color)] z-40 pb-[env(safe-area-inset-bottom)]">
+        <div className="no-print md:hidden fixed bottom-0 left-0 w-full bg-[var(--bg-card)] border-t border-[var(--border-color)] z-40 pb-[env(safe-area-inset-bottom)]">
             <nav className="flex justify-around items-center h-16 px-2">
                 <NavLink
                     to="/"

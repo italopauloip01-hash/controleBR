@@ -117,7 +117,7 @@ export default function UpdateBanner() {
     if (!hasUpdate || !isVisible) return null;
 
     return (
-        <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 z-50 bg-[#2563eb] text-white rounded-xl shadow-xl overflow-hidden animate-fade-in flex flex-col border border-blue-400">
+        <div className="no-print fixed bottom-20 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 z-50 bg-[#2563eb] text-white rounded-xl shadow-xl overflow-hidden animate-fade-in flex flex-col border border-blue-400">
             <div className="flex items-center justify-between p-4 bg-[#1e40af]">
                 <div className="flex items-center gap-2">
                     <DownloadCloud size={20} />

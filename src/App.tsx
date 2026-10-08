@@ -16,6 +16,8 @@ import Metas from './pages/Metas';
 import Investimentos from './pages/Investimentos';
 import Configuracoes from './pages/Configuracoes';
 import Veiculos from './pages/Veiculos';
+import Relatorio from './pages/Relatorio';
+import Importar from './pages/Importar';
 import Login from './pages/Login';
 import { FinanceProvider } from './context/FinanceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -46,7 +48,7 @@ function MainLayout() {
       <GamificationProvider>
         <div className="app-container">
           {/* Mobile Header */}
-          <div className="lg:hidden fixed top-0 left-0 w-full bg-[var(--bg-card)] border-b border-[var(--border-color)] z-40 flex items-center justify-between px-4 h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">
+          <div className="no-print lg:hidden fixed top-0 left-0 w-full bg-[var(--bg-card)] border-b border-[var(--border-color)] z-40 flex items-center justify-between px-4 h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]">
             <div className="font-bold text-xl text-[var(--color-xp)] flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-[var(--color-xp-light)] flex items-center justify-center">$</div>
               ControleBR
@@ -80,6 +82,8 @@ function MainLayout() {
               <Route path="/metas" element={<Metas />} />
               <Route path="/investimentos" element={<Investimentos />} />
               <Route path="/veiculos" element={<Veiculos />} />
+              <Route path="/relatorio" element={<Relatorio />} />
+              <Route path="/importar" element={<Importar />} />
               <Route path="/config" element={<Configuracoes />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

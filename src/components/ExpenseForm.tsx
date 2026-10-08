@@ -4,7 +4,9 @@ import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../context/AuthContext';
 import { inferCategoryName, isCarRelated, isFuelRelated } from '../utils/categoriesMap';
 import { formatCurrencyInput, parseCurrencyToFloat } from '../utils/currencyMask';
-import { todayLocalISO } from '../utils/format';
+import { todayLocalISO, formatCurrency as formatCurrencyBRL } from '../utils/format';
+import { useUserPrefs } from '../utils/userPrefs';
+import { budgetLevel, spentByCategory } from '../utils/budgets';
 import { useNotification } from '../context/NotificationContext';
 import { TrendingDown, CreditCard, Landmark, Calendar, Repeat, CheckCircle2, Car, Fuel, Map, RotateCcw } from 'lucide-react';
 import { type FuelType, FUEL_TYPES, detectFuelType, hasResetCycleTag, buildFuelDescription, cleanFuelDescription } from '../utils/fuelUtils';
@@ -26,6 +28,7 @@ export default function ExpenseForm({ onSuccess, initialData, fuelPrefill }: Exp
     const { categories, accounts, creditCards, vehicles, transactions, refreshData } = useFinance();
     const { user } = useAuth();
     const { showToast } = useNotification();
+    const { prefs } = useUserPrefs();
 
     const [description, setDescription] = useState(initialData?.description ? cleanFuelDescription(initialData.description) : '');
     const [fuelType, setFuelType] = useState<FuelType>(() => detectFuelType(initialData?.description));
@@ -262,7 +265,23 @@ export default function ExpenseForm({ onSuccess, initialData, fuelPrefill }: Exp
             setInstallments('1'); setVehicleId(''); setMileage(''); setLiters('');
             setFuelType('gasolina'); setIsResetCycle(false);
 
-            showToast(initialData ? 'Saída de recursos atualizada!' : 'Valor descontado com sucesso!', 'success');
+            // Alerta de orçamento: avisa quando a categoria passa de 80% ou estoura o limite do mês
+            const limit = finalCategoryId ? prefs.budgets?.[finalCategoryId] : undefined;
+            if (limit && !initialData) {
+                const period = date.slice(0, 7);
+                const spent = (spentByCategory(transactions, period)[finalCategoryId] || 0) + installmentAmount;
+                const percent = (spent / limit) * 100;
+                const catName = categories.find(c => c.id === finalCategoryId)?.name || 'Categoria';
+                if (budgetLevel(percent) !== 'ok') {
+                    showToast(percent >= 100
+                        ? `Gasto lançado. ⚠️ ${catName} estourou o orçamento: ${formatCurrencyBRL(spent)} de ${formatCurrencyBRL(limit)}.`
+                        : `Gasto lançado. ⚠️ ${catName} já usou ${percent.toFixed(0)}% do orçamento do mês.`, 'info');
+                } else {
+                    showToast('Valor descontado com sucesso!', 'success');
+                }
+            } else {
+                showToast(initialData ? 'Saída de recursos atualizada!' : 'Valor descontado com sucesso!', 'success');
+            }
             await refreshData();
             if (onSuccess) onSuccess();
 

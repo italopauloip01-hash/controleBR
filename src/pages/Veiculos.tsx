@@ -9,6 +9,11 @@ import { isCarRelated, isFuelRelated } from '../utils/categoriesMap';
 import VehicleForm from '../components/VehicleForm';
 import { calculateFuelMetrics, type FuelStats, FUEL_TYPES, detectFuelType, cleanFuelDescription, type FuelType } from '../utils/fuelUtils';
 
+// Abastecimento = descrição (sem tags automáticas) fala de combustível OU há litros registrados.
+// Assim, manutenção antiga marcada por engano com [Gasolina] não é tratada como combustível.
+const isFuelTx = (t: { description?: string | null; liters?: number | null }, categoryName: string = ''): boolean =>
+    isFuelRelated(cleanFuelDescription(t.description || ''), categoryName) || (t.liters || 0) > 0;
+
 export default function Veiculos() {
     const { transactions, categories, vehicles, refreshData, selectedMonth, selectedYear } = useFinance();
     const { confirmAction } = useNotification();
@@ -79,7 +84,7 @@ export default function Veiculos() {
         return globalCarTransactions
             .filter(t => {
                 const cat = categories.find(c => c.id === t.category_id)?.name || '';
-                return isFuelRelated(t.description || '', cat) && (t.mileage || 0) > 0;
+                return isFuelTx(t, cat) && (t.mileage || 0) > 0;
             })
             .sort((a, b) => (a.mileage || 0) - (b.mileage || 0)); // Ascending by mileage
     }, [globalCarTransactions, categories]);
@@ -113,7 +118,7 @@ export default function Veiculos() {
         monthlyCarTransactions.forEach(t => {
             const catObj = categories.find(c => c.id === t.category_id);
             const cat = catObj ? catObj.name : '';
-            if (isFuelRelated(t.description || '', cat)) {
+            if (isFuelTx(t, cat)) {
                 totalCombustivel += t.amount;
             } else {
                 totalOutros += t.amount;
@@ -480,7 +485,7 @@ export default function Veiculos() {
                                 <tbody>
                                     {monthlyCarTransactions.map((t, index) => {
                                         const catName = categories.find(c => c.id === t.category_id)?.name || '';
-                                        const isFuel = isFuelRelated(t.description || '', catName);
+                                        const isFuel = isFuelTx(t, catName);
                                         const seg = segmentMap.get(t.id);
                                         const fuelType = seg ? seg.fuelType : detectFuelType(t.description);
                                         const fuelInfo = FUEL_TYPES[fuelType] || FUEL_TYPES.gasolina;
@@ -567,7 +572,7 @@ export default function Veiculos() {
                         <div className="lg:hidden divide-y divide-[var(--border-color)]">
                             {monthlyCarTransactions.map((t) => {
                                 const catName = categories.find(c => c.id === t.category_id)?.name || '';
-                                const isFuel = isFuelRelated(t.description || '', catName);
+                                const isFuel = isFuelTx(t, catName);
                                 const seg = segmentMap.get(t.id);
                                 const fuelType = seg ? seg.fuelType : detectFuelType(t.description);
                                 const fuelInfo = FUEL_TYPES[fuelType] || FUEL_TYPES.gasolina;

@@ -158,12 +158,18 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                 }
             }
 
-            const finalDescription = (isCarExpense && (vehicleId || mileage || liters || isFuelRelated(description, suggestedName)))
-                ? buildFuelDescription(description, fuelType, isResetCycle)
-                : description;
-
             const cleanMileage = mileage ? parseFloat(String(mileage).replace(',', '.')) : null;
-            const cleanLiters = liters ? parseFloat(String(liters).replace(',', '.')) : null;
+            const rawLiters = liters ? parseFloat(String(liters).replace(',', '.')) : null;
+
+            // Só é abastecimento se a descrição/categoria indicar combustível (ignorando tags antigas) ou se houver litros informados.
+            // Manutenção, pneu, IPVA etc. NÃO recebem tag de combustível mesmo com veículo selecionado.
+            const baseDescription = cleanFuelDescription(description);
+            const isFuelExpense = isCarExpense && (isFuelRelated(baseDescription, suggestedName) || (rawLiters !== null && !isNaN(rawLiters) && rawLiters > 0));
+            const cleanLiters = isFuelExpense ? rawLiters : null;
+
+            const finalDescription = isFuelExpense
+                ? buildFuelDescription(description, fuelType, isResetCycle)
+                : (isCarExpense ? (baseDescription || description) : description);
 
             const payload = {
                 description: finalDescription,
@@ -218,6 +224,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
 
     const tempMappedCat = inferCategoryName(description, 'expense');
     const isCarExpenseLocal = isCarRelated(description, tempMappedCat);
+    const isFuelLocal = isCarExpenseLocal && isFuelRelated(cleanFuelDescription(description), tempMappedCat);
 
     return (
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
@@ -445,6 +452,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                             )}
 
                             {/* Seletor de Tipo de Combustível */}
+                            {isFuelLocal && (
                             <div>
                                 <label className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--color-carro)] uppercase tracking-widest mb-1.5 px-1">
                                     <Fuel size={12}/> Tipo de Combustível Utilizado
@@ -471,6 +479,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                     })}
                                 </div>
                             </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -485,6 +494,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                         placeholder="Ex: 50200"
                                     />
                                 </div>
+                                {isFuelLocal && (
                                 <div>
                                     <label className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--color-carro)] uppercase tracking-widest mb-1.5 px-1">
                                         <Fuel size={12}/> Volume Abastecido
@@ -497,9 +507,11 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                         placeholder="Litros Ex: 40"
                                     />
                                 </div>
+                                )}
                             </div>
 
                             {/* Reset / Novo Ciclo de Média */}
+                            {isFuelLocal && (
                             <div className="pt-2 border-t border-[var(--color-carro)]/15">
                                 <label className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
                                     isResetCycle
@@ -523,6 +535,7 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                                     </div>
                                 </label>
                             </div>
+                            )}
                         </div>
                     </div>
                 )}

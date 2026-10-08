@@ -76,9 +76,9 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
             onResult(reading);
             reset();
             setIsOpen(false);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error reading fuel photos:', error);
-            showToast(error?.message || 'Não foi possível ler as fotos.', 'error');
+            showToast(error instanceof Error ? error.message : 'Não foi possível ler as fotos.', 'error');
         } finally {
             setIsReading(false);
         }

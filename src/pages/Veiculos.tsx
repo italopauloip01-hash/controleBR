@@ -3,10 +3,12 @@ import { useFinance } from '../context/FinanceContext';
 import { supabase } from '../utils/supabase';
 import { useNotification } from '../context/NotificationContext';
 import PeriodFilter from '../components/PeriodFilter';
-import { Car, Fuel, Wrench, AlertCircle, PlusCircle, Edit2, Trash2, Calendar, MapPin, TrendingUp, Activity, Route, Calculator, RotateCcw, ShieldCheck, Zap, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Car, Fuel, Wrench, AlertCircle, PlusCircle, Edit2, Trash2, Calendar, MapPin, TrendingUp, Activity, Route, Calculator, RotateCcw, ShieldCheck, Zap, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
 import { isCarRelated, isFuelRelated } from '../utils/categoriesMap';
 import VehicleForm from '../components/VehicleForm';
+import ExpenseForm, { type FuelPrefill } from '../components/ExpenseForm';
+import FuelPhotoButton from '../components/FuelPhotoButton';
 import { calculateFuelMetrics, type FuelStats, FUEL_TYPES, detectFuelType, cleanFuelDescription, type FuelType } from '../utils/fuelUtils';
 
 // Abastecimento = descrição (sem tags automáticas) fala de combustível OU há litros registrados.
@@ -20,6 +22,7 @@ export default function Veiculos() {
     const [selectedVehicleId, setSelectedVehicleId] = useState('all');
     const [isAddingVehicle, setIsAddingVehicle] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState<any | null>(null);
+    const [photoPrefill, setPhotoPrefill] = useState<FuelPrefill | null>(null);
 
     // States for Simulator
     const [simDistancia, setSimDistancia] = useState<number | ''>('');
@@ -198,6 +201,12 @@ export default function Veiculos() {
                             </div>
                         )}
 
+                        <FuelPhotoButton
+                            onResult={(reading) => setPhotoPrefill({ reading, vehicleId: selectedVehicleId })}
+                            label="Foto"
+                            className="p-3 bg-[var(--color-carro)] text-white rounded-xl shadow-sm hover:opacity-90 [&>span]:hidden sm:[&>span]:block"
+                        />
+
                         <button
                             onClick={() => setIsAddingVehicle(!isAddingVehicle)}
                             className={`p-3 bg-[var(--bg-secondary)] rounded-xl flex items-center justify-center transition-all shadow-sm font-medium gap-2 ${isAddingVehicle ? 'border border-[var(--color-carro)] text-[var(--color-carro)]' : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--color-carro)]'}`}
@@ -212,6 +221,27 @@ export default function Veiculos() {
             {isAddingVehicle && (
                 <div className="animate-in fade-in slide-in-from-top-4 duration-300">
                     <VehicleForm onClose={() => setIsAddingVehicle(false)} />
+                </div>
+            )}
+
+            {photoPrefill && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]" onMouseDown={() => setPhotoPrefill(null)}>
+                    <div
+                        className="bg-[var(--bg-color)] rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col relative border border-[var(--border)]"
+                        onMouseDown={e => e.stopPropagation()}
+                    >
+                        <div className="flex justify-end p-2 pb-0 shrink-0">
+                            <button
+                                onClick={() => setPhotoPrefill(null)}
+                                className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-heading)] hover:bg-[var(--bg-secondary)] rounded-full transition-colors z-10"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto p-1 pb-4">
+                            <ExpenseForm fuelPrefill={photoPrefill} onSuccess={() => setPhotoPrefill(null)} />
+                        </div>
+                    </div>
                 </div>
             )}
 

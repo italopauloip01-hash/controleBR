@@ -8,13 +8,21 @@ import { todayLocalISO } from '../utils/format';
 import { useNotification } from '../context/NotificationContext';
 import { TrendingDown, CreditCard, Landmark, Calendar, Repeat, CheckCircle2, Car, Fuel, Map, RotateCcw, AlertTriangle } from 'lucide-react';
 import { type FuelType, FUEL_TYPES, detectFuelType, hasResetCycleTag, buildFuelDescription, cleanFuelDescription } from '../utils/fuelUtils';
+import type { FuelPhotoReading } from '../utils/fuelPhotoReader';
+import FuelPhotoButton from './FuelPhotoButton';
+
+export interface FuelPrefill {
+    reading: FuelPhotoReading;
+    vehicleId?: string;
+}
 
 interface ExpenseFormProps {
     onSuccess?: () => void;
     initialData?: any;
+    fuelPrefill?: FuelPrefill;
 }
 
-export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps) {
+export default function ExpenseForm({ onSuccess, initialData, fuelPrefill }: ExpenseFormProps) {
     const { categories, accounts, creditCards, vehicles, transactions, refreshData } = useFinance();
     const { user } = useAuth();
     const { showToast } = useNotification();
@@ -46,6 +54,53 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
     const [liters, setLiters] = useState(initialData?.liters ? String(initialData.liters) : '');
     const [categoryId, setCategoryId] = useState(initialData?.category_id || '');
     const [isManualCategory, setIsManualCategory] = useState(!!initialData);
+
+    // Preenche o formulário com o que foi lido nas fotos da bomba/painel
+    const applyFuelReading = (reading: FuelPhotoReading, preferredVehicleId?: string) => {
+        if (!cleanFuelDescription(description) || !isFuelRelated(cleanFuelDescription(description), '')) {
+            setDescription('Abastecimento');
+        }
+        if (reading.combustivel) setFuelType(reading.combustivel);
+        if (reading.valor_total != null) setAmount(formatCurrencyInput((reading.valor_total * 100).toFixed(0)));
+        if (reading.litros != null) setLiters(String(reading.litros));
+        if (reading.odometro_km != null) setMileage(String(Math.round(reading.odometro_km)));
+        if (reading.data_foto) setDate(reading.data_foto);
+
+        const targetVehicleId = preferredVehicleId && preferredVehicleId !== 'all'
+            ? preferredVehicleId
+            : (vehicleId || (vehicles.length === 1 ? vehicles[0].id : ''));
+        if (targetVehicleId) setVehicleId(targetVehicleId);
+
+        const missing = [
+            reading.odometro_km == null && 'KM',
+            reading.litros == null && 'litros',
+            reading.valor_total == null && 'valor',
+        ].filter(Boolean);
+
+        // Alerta se o KM lido for menor que o último registrado para o veículo (dígito lido errado)
+        const lastMileage = Math.max(0, ...transactions
+            .filter(t => t.mileage && (!targetVehicleId || t.vehicle_id === targetVehicleId) && t.id !== initialData?.id)
+            .map(t => t.mileage as number));
+
+        if (reading.odometro_km != null && lastMileage > 0 && reading.odometro_km < lastMileage) {
+            showToast(`Confira o KM: ${reading.odometro_km.toLocaleString('pt-BR')} é menor que o último registro (${lastMileage.toLocaleString('pt-BR')}).`, 'error');
+        } else if (missing.length > 0) {
+            showToast(`Fotos lidas! Não encontrei: ${missing.join(', ')}. Complete manualmente.`, 'info');
+        } else if (reading.observacoes) {
+            showToast(`Fotos lidas — confira: ${reading.observacoes}`, 'info');
+        } else {
+            showToast('Fotos lidas! Confira os valores e escolha o pagamento.', 'success');
+        }
+    };
+
+    const appliedPrefillRef = useRef<FuelPrefill | null>(null);
+    useEffect(() => {
+        if (fuelPrefill && appliedPrefillRef.current !== fuelPrefill) {
+            appliedPrefillRef.current = fuelPrefill;
+            applyFuelReading(fuelPrefill.reading, fuelPrefill.vehicleId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fuelPrefill]);
 
     const expenseCategories = useMemo(() => {
         return categories.filter(c => c.type === 'expense' || c.type === 'transference' || !c.type);
@@ -232,12 +287,17 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                 <div className="p-3 bg-rose-500/10 text-rose-500 rounded-2xl border border-rose-500/20">
                     <TrendingDown size={24} />
                 </div>
-                <div>
+                <div className="flex-1">
                     <h2 className="text-2xl font-black text-[var(--color-despesa)] tracking-tight">
                         {initialData ? 'Corrigir Lançamento' : 'Novo Gasto'}
                     </h2>
                     <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-0.5">Subtração de Capital</p>
                 </div>
+                <FuelPhotoButton
+                    onResult={(reading) => applyFuelReading(reading)}
+                    label="Abastecimento por foto"
+                    className="px-3 py-2.5 text-xs rounded-xl bg-[var(--color-carro)]/10 text-[var(--color-carro)] border-2 border-[var(--color-carro)]/30 hover:bg-[var(--color-carro)]/20"
+                />
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 rounded-3xl shadow-sm flex flex-col gap-5">

@@ -78,10 +78,10 @@ export default function IncomeForm({ onSuccess, initialData }: IncomeFormProps) 
                 amount: parseCurrencyToFloat(amount),
                 date,
                 type: 'revenue',
-                category_id: finalCategoryId,
-                account_id: accountId || null,
+                category_id: (finalCategoryId && String(finalCategoryId).trim() !== '') ? finalCategoryId : null,
+                account_id: (accountId && String(accountId).trim() !== '') ? accountId : null,
                 is_fixed: isFixed,
-                fixed_end_date: isFixed && fixedEndDate ? fixedEndDate : null,
+                fixed_end_date: (isFixed && fixedEndDate && fixedEndDate.trim() !== '') ? fixedEndDate : null,
                 is_paid: isPaid,
                 user_id: user?.id
             };

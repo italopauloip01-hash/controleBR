@@ -97,8 +97,8 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
             const suggestedName = inferCategoryName(description, 'expense');
             const isCarExpense = isCarRelated(description, suggestedName);
             
-            // Se ainda não tem ID (ex: "Outros" ainda não criado no banco deste usuário)
-            if (!finalCategoryId) {
+            // Se ainda não tem ID (ex: categoria sugerida ainda não criada no banco deste usuário)
+            if (!finalCategoryId || !finalCategoryId.trim()) {
                 const existingCategory = expenseCategories.find(c => 
                     c.name.trim().toLowerCase() === suggestedName.toLowerCase()
                 );
@@ -106,18 +106,31 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                 if (existingCategory) {
                     finalCategoryId = existingCategory.id;
                 } else {
-                    const { data: newCat, error: catError } = await supabase
-                        .from('categories')
-                        .insert({ name: suggestedName, type: 'expense', user_id: user?.id })
-                        .select()
-                        .single();
-                    if (!catError && newCat) finalCategoryId = newCat.id;
+                    try {
+                        const { data: newCat, error: catError } = await supabase
+                            .from('categories')
+                            .insert({ name: suggestedName, type: 'expense', user_id: user?.id })
+                            .select()
+                            .maybeSingle();
+                        if (!catError && newCat) finalCategoryId = newCat.id;
+                    } catch (catErr) {
+                        console.warn('Erro ao auto-criar categoria:', catErr);
+                    }
+                }
+
+                // Fallback adicional: categoria 'Outros' ou a primeira disponível
+                if (!finalCategoryId || !finalCategoryId.trim()) {
+                    const fallbackCat = expenseCategories.find(c => c.name.toLowerCase().includes('outro')) || expenseCategories[0];
+                    if (fallbackCat) {
+                        finalCategoryId = fallbackCat.id;
+                    }
                 }
             }
 
             let finalAccountId = accountId;
             if (isCashOption && !finalAccountId) {
                 const cashAccount = accounts.find(acc => 
+                    acc.type === 'Dinheiro' ||
                     acc.name.toLowerCase().includes('dinheiro') || 
                     acc.name.toLowerCase().includes('mãos')
                 );
@@ -125,19 +138,22 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                 if (cashAccount) {
                     finalAccountId = cashAccount.id;
                 } else {
-                    const { data: newAcc, error: accError } = await supabase
-                        .from('accounts')
-                        .insert({
-                            name: 'Dinheiro em Mãos',
-                            type: 'other',
-                            balance: 0,
-                            user_id: user.id
-                        })
-                        .select()
-                        .single();
-                    
-                    if (accError) throw accError;
-                    if (newAcc) finalAccountId = newAcc.id;
+                    try {
+                        const { data: newAcc, error: accError } = await supabase
+                            .from('accounts')
+                            .insert({
+                                name: 'Dinheiro em Mãos',
+                                type: 'Dinheiro',
+                                balance: 0,
+                                user_id: user.id
+                            })
+                            .select()
+                            .maybeSingle();
+                        
+                        if (!accError && newAcc) finalAccountId = newAcc.id;
+                    } catch (accErr) {
+                        console.warn('Não foi possível auto-criar conta Dinheiro em Mãos:', accErr);
+                    }
                 }
             }
 
@@ -145,22 +161,25 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
                 ? buildFuelDescription(description, fuelType, isResetCycle)
                 : description;
 
+            const cleanMileage = mileage ? parseFloat(String(mileage).replace(',', '.')) : null;
+            const cleanLiters = liters ? parseFloat(String(liters).replace(',', '.')) : null;
+
             const payload = {
                 description: finalDescription,
                 amount: initialData ? floatAmount : installmentAmount,
                 date,
                 type: initialData ? initialData.type : 'expense',
-                category_id: finalCategoryId,
-                account_id: !isCarCreditOption && finalAccountId ? finalAccountId : null,
-                credit_card_id: isCarCreditOption && creditCardId ? creditCardId : null,
+                category_id: (finalCategoryId && finalCategoryId.trim() !== '') ? finalCategoryId : null,
+                account_id: (!isCarCreditOption && finalAccountId && finalAccountId.trim() !== '') ? finalAccountId : null,
+                credit_card_id: (isCarCreditOption && creditCardId && creditCardId.trim() !== '') ? creditCardId : null,
                 payment_method: paymentMethod || null,
                 is_fixed: isFixed,
-                fixed_end_date: isFixed && fixedEndDate ? fixedEndDate : null,
+                fixed_end_date: (isFixed && fixedEndDate && fixedEndDate.trim() !== '') ? fixedEndDate : null,
                 is_paid: isCarCreditOption ? false : isPaid,
                 installments: initialData ? initialData.installments : numInstallments,
-                vehicle_id: (isCarExpense && vehicleId) ? vehicleId : null,
-                mileage: (isCarExpense && mileage) ? parseFloat(mileage) : null,
-                liters: (isCarExpense && liters) ? parseFloat(liters) : null,
+                vehicle_id: (isCarExpense && vehicleId && vehicleId.trim() !== '' && vehicleId !== 'all') ? vehicleId : null,
+                mileage: (isCarExpense && cleanMileage !== null && !isNaN(cleanMileage) && cleanMileage > 0) ? cleanMileage : null,
+                liters: (isCarExpense && cleanLiters !== null && !isNaN(cleanLiters) && cleanLiters > 0) ? cleanLiters : null,
                 user_id: user?.id
             };
 
@@ -182,7 +201,15 @@ export default function ExpenseForm({ onSuccess, initialData }: ExpenseFormProps
 
         } catch (error: any) {
             console.error('Error adding expense:', error);
-            showToast(`Erro ao lançar despesa: ${error?.message || 'Falha'}`, 'error');
+            let friendlyMsg = error?.message || 'Falha ao registrar saída.';
+            if (error?.code === '22P02') {
+                friendlyMsg = 'Formato inválido em um dos campos selecionados.';
+            } else if (error?.code === '23514') {
+                friendlyMsg = 'Dados inválidos para tipo de conta ou restrição cadastrada.';
+            } else if (error?.code === '23503') {
+                friendlyMsg = 'Conta, cartão ou categoria selecionada não foi encontrada.';
+            }
+            showToast(`Erro ao lançar despesa: ${friendlyMsg}`, 'error');
         } finally {
             setIsSubmitting(false);
         }

@@ -9,7 +9,7 @@ import { isCarRelated, isFuelRelated } from '../utils/categoriesMap';
 import VehicleForm from '../components/VehicleForm';
 import ExpenseForm, { type FuelPrefill } from '../components/ExpenseForm';
 import FuelPhotoButton from '../components/FuelPhotoButton';
-import { calculateFuelMetrics, type FuelStats, FUEL_TYPES, detectFuelType, cleanFuelDescription, type FuelType } from '../utils/fuelUtils';
+import { calculateFuelMetrics, FUEL_TYPES, detectFuelType, cleanFuelDescription, type FuelSegmentCalculation } from '../utils/fuelUtils';
 
 // Abastecimento = descrição (sem tags automáticas) fala de combustível OU há litros registrados.
 // Assim, manutenção antiga marcada por engano com [Gasolina] não é tratada como combustível.
@@ -26,7 +26,7 @@ export default function Veiculos() {
 
     // States for Simulator
     const [simDistancia, setSimDistancia] = useState<number | ''>('');
-    const [simPrecoCombustivel, setSimPrecoCombustivel] = useState<number>(5.80);
+    const [simPrecoCombustivel, setSimPrecoCombustivel] = useState<number | ''>(5.80);
     const [simPedagios, setSimPedagios] = useState<number | ''>('');
     const [simCombustivelTipo, setSimCombustivelTipo] = useState<'geral' | 'gasolina' | 'etanol'>('geral');
 
@@ -99,7 +99,7 @@ export default function Veiculos() {
 
     // Mapeamento rápido de cálculos por transação
     const segmentMap = useMemo(() => {
-        const map = new Map<string, any>();
+        const map = new Map<string, FuelSegmentCalculation>();
         fuelStats.segments.forEach(s => map.set(s.transactionId, s));
         return map;
     }, [fuelStats]);

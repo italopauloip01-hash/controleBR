@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { startOfMonth, endOfMonth, format, parseISO, isWithinInterval } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { FileText, TrendingUp, TrendingDown, Filter, Download, Calendar } from 'lucide-react';
 import TransactionList from '../components/TransactionList';
 import { todayLocalISO, parseDateLocal } from '../utils/format';

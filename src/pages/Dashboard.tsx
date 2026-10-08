@@ -2,8 +2,7 @@ import { useMemo, useEffect, useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
-import { format, startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { startOfMonth, endOfMonth, isWithinInterval, setMonth, setYear } from 'date-fns';
 import { Wallet, TrendingUp, TrendingDown, Target, Zap, User, Sun, Moon, Sunrise, PieChart as PieChartIcon, Clock } from 'lucide-react';
 import PeriodFilter from '../components/PeriodFilter';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
@@ -11,7 +10,7 @@ import { formatCurrency, parseDateLocal, todayLocalISO } from '../utils/format';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
-    const { transactions, accounts, categoryMap, goals, investments, isLoading, selectedMonth, selectedYear, refreshData } = useFinance();
+    const { transactions, accounts, categoryMap, isLoading,selectedMonth, selectedYear, refreshData } = useFinance();
     const { level, rankName, progressPercentage, currentXP, xpForNextLevel } = useGamification();
     const { user } = useAuth();
 

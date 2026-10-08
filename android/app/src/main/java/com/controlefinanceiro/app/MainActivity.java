@@ -9,7 +9,6 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         // Registrar o plugin personalizado para que o Capacitor o encontre
         registerPlugin(UpdatePlugin.class);
-        registerPlugin(TextReaderPlugin.class);
 
         super.onCreate(savedInstanceState);
         

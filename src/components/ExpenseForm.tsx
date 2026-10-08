@@ -6,7 +6,7 @@ import { inferCategoryName, isCarRelated, isFuelRelated } from '../utils/categor
 import { formatCurrencyInput, parseCurrencyToFloat } from '../utils/currencyMask';
 import { todayLocalISO } from '../utils/format';
 import { useNotification } from '../context/NotificationContext';
-import { TrendingDown, CreditCard, Landmark, Calendar, Repeat, CheckCircle2, Car, Fuel, Map, RotateCcw, AlertTriangle } from 'lucide-react';
+import { TrendingDown, CreditCard, Landmark, Calendar, Repeat, CheckCircle2, Car, Fuel, Map, RotateCcw } from 'lucide-react';
 import { type FuelType, FUEL_TYPES, detectFuelType, hasResetCycleTag, buildFuelDescription, cleanFuelDescription } from '../utils/fuelUtils';
 import type { FuelPhotoReading } from '../utils/fuelPhotoReader';
 import FuelPhotoButton from './FuelPhotoButton';
@@ -60,7 +60,6 @@ export default function ExpenseForm({ onSuccess, initialData, fuelPrefill }: Exp
         if (!cleanFuelDescription(description) || !isFuelRelated(cleanFuelDescription(description), '')) {
             setDescription('Abastecimento');
         }
-        if (reading.combustivel) setFuelType(reading.combustivel);
         if (reading.valor_total != null) setAmount(formatCurrencyInput((reading.valor_total * 100).toFixed(0)));
         if (reading.litros != null) setLiters(String(reading.litros));
         if (reading.odometro_km != null) setMileage(String(Math.round(reading.odometro_km)));
@@ -70,6 +69,12 @@ export default function ExpenseForm({ onSuccess, initialData, fuelPrefill }: Exp
             ? preferredVehicleId
             : (vehicleId || (vehicles.length === 1 ? vehicles[0].id : ''));
         if (targetVehicleId) setVehicleId(targetVehicleId);
+
+        // A foto lê só os números; o combustível vem do último abastecimento desse veículo
+        const lastFuel = transactions
+            .filter(t => (t.liters || 0) > 0 && (!targetVehicleId || t.vehicle_id === targetVehicleId))
+            .sort((a, b) => (b.mileage || 0) - (a.mileage || 0) || b.date.localeCompare(a.date))[0];
+        if (lastFuel) setFuelType(detectFuelType(lastFuel.description));
 
         const missing = [
             reading.odometro_km == null && 'KM',

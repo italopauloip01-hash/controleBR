@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFinance } from '../context/FinanceContext';
 import { supabase } from '../utils/supabase';
 import { useNotification } from '../context/NotificationContext';
@@ -233,8 +234,8 @@ export default function Veiculos() {
                 </div>
             )}
 
-            {photoPrefill && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]" onMouseDown={() => setPhotoPrefill(null)}>
+            {photoPrefill && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]" onMouseDown={() => setPhotoPrefill(null)}>
                     <div
                         className="bg-[var(--bg-color)] rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col relative border border-[var(--border)]"
                         onMouseDown={e => e.stopPropagation()}
@@ -251,7 +252,8 @@ export default function Veiculos() {
                             <ExpenseForm fuelPrefill={photoPrefill} onSuccess={() => setPhotoPrefill(null)} />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
 
             {editingVehicle && (

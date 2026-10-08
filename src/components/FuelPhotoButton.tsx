@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Loader2, Fuel, Gauge, CheckCircle2, X, RefreshCw } from 'lucide-react';
 import { useNotification } from '../context/NotificationContext';
 import { useFinance } from '../context/FinanceContext';
@@ -140,10 +141,11 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
 
             <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
 
-            {isOpen && (
-                <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" onMouseDown={close}>
+            {/* Portal no <body>: a página tem animação (transform), que prenderia a janela atrás da barra de navegação */}
+            {isOpen && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]" onMouseDown={close}>
                     <div
-                        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl shadow-2xl w-full max-w-md p-5 flex flex-col gap-4"
+                        className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl shadow-2xl w-full max-w-md max-h-full overflow-y-auto p-5 flex flex-col gap-4"
                         onMouseDown={e => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between">
@@ -185,7 +187,8 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
         </>
     );

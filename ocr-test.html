@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>OCR teste</title></head>
+<body style="font-family:monospace;background:#fff;color:#000;padding:16px">
+<pre id="out">rodando...</pre>
+<script type="module">
+import { readFuelPhotos } from '/src/utils/fuelPhotoReader.ts';
+const out = document.getElementById('out');
+const load = async (url, name, type) => new File([await (await fetch(url)).blob()], name, { type });
+const t0 = performance.now();
+try {
+  const files = { pump: await load('/ocr-test/bomba.png', 'bomba.png', 'image/png'), dash: await load('/ocr-test/painel.webp', 'painel.webp', 'image/webp') };
+  const r = await readFuelPhotos(files,Number(new URLSearchParams(location.search).get('last') || 0));
+  out.textContent = 'OK ' + ((performance.now() - t0) / 1000).toFixed(1) + 's\n' + JSON.stringify(r, null, 2);
+} catch (e) { out.textContent = 'ERRO ' + e.message + '\n' + e.stack; }
+window.__done = true;
+</script>
+</body>
+</html>

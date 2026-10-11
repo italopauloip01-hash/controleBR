@@ -18,7 +18,7 @@ const STEPS: Record<Step, { number: number; title: string; hint: string; icon: t
     pump: {
         number: 1,
         title: 'Foto da BOMBA',
-        hint: 'Mostre os 3 visores: Total a pagar, Litros e Preço por litro.',
+        hint: 'Mostre os visores: Total a pagar, Litros e Preço por litro.',
         icon: Fuel,
     },
     dash: {
@@ -29,8 +29,7 @@ const STEPS: Record<Step, { number: number; title: string; hint: string; icon: t
     },
 };
 
-// Fluxo guiado em 2 fotos obrigatórias: 1ª da bomba, 2ª do painel.
-// Cada foto tem papel fixo, então os números de uma não se confundem com os da outra.
+// Fluxo flexível: lê com 1 foto (só a bomba para valor/litros/preço) ou com 2 fotos (bomba + painel para incluir KM).
 export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler fotos', className = '' }: FuelPhotoButtonProps) {
     const { showToast } = useNotification();
     const { transactions } = useFinance();
@@ -40,8 +39,7 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
     const [dashFile, setDashFile] = useState<File | null>(null);
     const [isReading, setIsReading] = useState(false);
     const [previews, setPreviews] = useState<{ pump?: string; dash?: string }>({});
-
-    const currentStep: Step = pumpFile ? 'dash' : 'pump';
+    const [targetSlot, setTargetSlot] = useState<Step>('pump');
 
     // Último KM registrado ajuda a achar o hodômetro entre os números do painel
     const lastMileage = () => {
@@ -65,13 +63,22 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
         setIsOpen(false);
     };
 
-    const read = async (pump: File, dash: File) => {
+    const openPicker = (step: Step) => {
+        setTargetSlot(step);
+        inputRef.current?.click();
+    };
+
+    const read = async (overridePump?: File | null, overrideDash?: File | null) => {
+        const p = overridePump !== undefined ? overridePump : pumpFile;
+        const d = overrideDash !== undefined ? overrideDash : dashFile;
+        if (!p && !d) return;
+
         setIsReading(true);
         try {
-            const reading = await readFuelPhotos({ pump, dash }, lastMileage());
-            const found = [reading.odometro_km, reading.litros, reading.valor_total].filter(v => v != null).length;
+            const reading = await readFuelPhotos({ pump: p, dash: d }, lastMileage());
+            const found = [reading.odometro_km, reading.litros, reading.valor_total, reading.preco_litro].filter(v => v != null).length;
             if (found === 0) {
-                showToast('Não consegui ler os números. Tente fotos mais nítidas, de frente e sem reflexo.', 'error');
+                showToast('Não consegui ler os visores na imagem. Dica: tire a foto bem de frente, aproximando dos números da bomba e sem reflexo.', 'error');
                 return;
             }
             onResult(reading);
@@ -79,7 +86,7 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
             setIsOpen(false);
         } catch (error) {
             console.error('Error reading fuel photos:', error);
-            showToast(error instanceof Error ? error.message : 'Não foi possível ler as fotos.', 'error');
+            showToast(error instanceof Error ? error.message : 'Erro ao processar a imagem. Tente escolher a foto novamente.', 'error');
         } finally {
             setIsReading(false);
         }
@@ -90,39 +97,45 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
         e.target.value = '';
         if (!file) return;
 
-        if (currentStep === 'pump') {
+        if (targetSlot === 'pump') {
+            if (previews.pump) URL.revokeObjectURL(previews.pump);
             setPumpFile(file);
             setPreviews(p => ({ ...p, pump: URL.createObjectURL(file) }));
         } else {
-            if (pumpFile && file.name === pumpFile.name && file.size === pumpFile.size) {
-                showToast('Essa é a mesma foto da bomba. Escolha agora a foto do PAINEL.', 'error');
-                return;
-            }
+            if (previews.dash) URL.revokeObjectURL(previews.dash);
             setDashFile(file);
             setPreviews(p => ({ ...p, dash: URL.createObjectURL(file) }));
-            if (pumpFile) read(pumpFile, file);
         }
     };
 
     const renderSlot = (step: Step, file: File | null, preview?: string) => {
         const info = STEPS[step];
         const Icon = info.icon;
-        const isCurrent = currentStep === step && !dashFile;
+        const isPump = step === 'pump';
+
         return (
-            <div className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all ${
-                file ? 'border-emerald-500/40 bg-emerald-500/5'
-                    : isCurrent ? 'border-[var(--color-carro)] bg-[var(--color-carro)]/5'
-                    : 'border-[var(--border-color)] opacity-50'
-            }`}>
+            <div
+                onClick={() => !isReading && openPicker(step)}
+                className={`flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all cursor-pointer hover:border-[var(--color-carro)] ${
+                    file ? 'border-emerald-500/40 bg-emerald-500/5'
+                        : isPump ? 'border-[var(--color-carro)]/60 bg-[var(--color-carro)]/5'
+                        : 'border-[var(--border-color)] bg-[var(--bg-secondary)]/30'
+                }`}
+            >
                 <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-[var(--bg-secondary)] flex items-center justify-center border border-[var(--border-color)]">
                     {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : <Icon size={24} className="text-[var(--color-carro)]" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Passo {info.number} de 2</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">
+                            {isPump ? 'Principal' : 'Opcional (para KM)'}
+                        </p>
+                        {file && <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">Foto pronta</span>}
+                    </div>
                     <p className="font-black text-[var(--text-primary)] text-sm">{info.title}</p>
-                    <p className="text-[11px] text-[var(--text-secondary)] leading-snug">{info.hint}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-snug">{file ? 'Toque para trocar a foto' : info.hint}</p>
                 </div>
-                {file && <CheckCircle2 size={22} className="text-emerald-500 shrink-0" />}
+                {file ? <CheckCircle2 size={22} className="text-emerald-500 shrink-0" /> : <Camera size={18} className="text-[var(--text-muted)] shrink-0" />}
             </div>
         );
     };
@@ -158,32 +171,84 @@ export default function FuelPhotoButton({ onResult, vehicleId, label = 'Ler foto
                             </button>
                         </div>
 
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                            Fotografe a <strong>bomba</strong> (visores de valor, litros e preço). A foto do painel é opcional para capturar o KM.
+                        </p>
+
                         {renderSlot('pump', pumpFile, previews.pump)}
                         {renderSlot('dash', dashFile, previews.dash)}
 
                         {isReading ? (
                             <div className="flex items-center justify-center gap-2 py-4 font-bold text-[var(--color-carro)]">
-                                <Loader2 size={20} className="animate-spin" /> Lendo as fotos...
+                                <Loader2 size={20} className="animate-spin" /> Lendo e identificando números...
                             </div>
                         ) : (
-                            <div className="flex gap-2">
-                                {pumpFile && (
+                            <div className="flex flex-col gap-2 pt-1">
+                                <div className="flex gap-2">
+                                    {(pumpFile || dashFile) && (
+                                        <button
+                                            type="button"
+                                            onClick={reset}
+                                            className="px-4 py-3.5 rounded-2xl border-2 border-[var(--border-color)] text-[var(--text-secondary)] font-bold flex items-center gap-1.5 hover:bg-[var(--bg-secondary)]"
+                                        >
+                                            <RefreshCw size={16} /> Limpar
+                                        </button>
+                                    )}
+
+                                    {!pumpFile && !dashFile && (
+                                        <button
+                                            type="button"
+                                            onClick={() => openPicker('pump')}
+                                            className="flex-1 py-3.5 rounded-2xl bg-[var(--color-carro)] text-white font-black flex items-center justify-center gap-2 shadow-md hover:opacity-90"
+                                        >
+                                            <Camera size={18} />
+                                            Escolher foto da bomba
+                                        </button>
+                                    )}
+
+                                    {pumpFile && !dashFile && (
+                                        <button
+                                            type="button"
+                                            onClick={() => read()}
+                                            className="flex-1 py-3.5 rounded-2xl bg-[var(--color-carro)] text-white font-black flex items-center justify-center gap-2 shadow-md hover:opacity-90"
+                                        >
+                                            <Camera size={18} />
+                                            Ler foto da bomba
+                                        </button>
+                                    )}
+
+                                    {pumpFile && dashFile && (
+                                        <button
+                                            type="button"
+                                            onClick={() => read()}
+                                            className="flex-1 py-3.5 rounded-2xl bg-[var(--color-carro)] text-white font-black flex items-center justify-center gap-2 shadow-md hover:opacity-90"
+                                        >
+                                            <Camera size={18} />
+                                            Ler fotos (Bomba + Painel)
+                                        </button>
+                                    )}
+
+                                    {!pumpFile && dashFile && (
+                                        <button
+                                            type="button"
+                                            onClick={() => read()}
+                                            className="flex-1 py-3.5 rounded-2xl bg-[var(--color-carro)] text-white font-black flex items-center justify-center gap-2 shadow-md hover:opacity-90"
+                                        >
+                                            <Camera size={18} />
+                                            Ler foto do painel
+                                        </button>
+                                    )}
+                                </div>
+
+                                {pumpFile && !dashFile && (
                                     <button
                                         type="button"
-                                        onClick={reset}
-                                        className="px-4 py-3.5 rounded-2xl border-2 border-[var(--border-color)] text-[var(--text-secondary)] font-bold flex items-center gap-1.5"
+                                        onClick={() => openPicker('dash')}
+                                        className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--color-carro)] py-1.5 text-center transition-colors"
                                     >
-                                        <RefreshCw size={16} /> Refazer
+                                        + Adicionar foto do painel para capturar o KM
                                     </button>
                                 )}
-                                <button
-                                    type="button"
-                                    onClick={() => (dashFile && pumpFile ? read(pumpFile, dashFile) : inputRef.current?.click())}
-                                    className="flex-1 py-3.5 rounded-2xl bg-[var(--color-carro)] text-white font-black flex items-center justify-center gap-2 shadow-md"
-                                >
-                                    <Camera size={18} />
-                                    {dashFile ? 'Ler novamente' : `Escolher foto ${STEPS[currentStep].number} de 2`}
-                                </button>
                             </div>
                         )}
                     </div>

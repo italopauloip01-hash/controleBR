@@ -71,7 +71,7 @@ function luminanceMap(img: ImageData): Float32Array {
 // No modo tolerante aceita fundos mais apagados (visor sem luz, foto de dia).
 function backlitMask(img: ImageData, tolerant: boolean): Uint8Array {
     const { data, width, height } = img;
-    const minBright = tolerant ? 90 : 120, minSat = tolerant ? 0.15 : 0.3;
+    const minBright = tolerant ? 60 : 90, minSat = tolerant ? 0.07 : 0.18;
     const mask = new Uint8Array(width * height);
     for (let i = 0, p = 0; p < mask.length; i += 4, p++) {
         const r = data[i], g = data[i + 1], b = data[i + 2];
@@ -81,24 +81,45 @@ function backlitMask(img: ImageData, tolerant: boolean): Uint8Array {
     return mask;
 }
 
-// Fecha pequenos buracos (dígitos escuros) para o visor virar um bloco só
-function dilate(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+// Máscara de janelas escuras (visores LED ou LCDs com fundo escuro e dígitos acesos)
+function darkWindowMask(lum: Float32Array, width: number, height: number): Uint8Array {
+    const mask = new Uint8Array(width * height);
+    for (let p = 0; p < mask.length; p++) {
+        if (lum[p] < 80) mask[p] = 1;
+    }
+    return mask;
+}
+
+// Densidade de traços verticais: identifica dígitos independentemente da cor (LED, LCD cinza, etc.)
+function edgeDensityMask(lum: Float32Array, width: number, height: number): Uint8Array {
+    const mask = new Uint8Array(width * height);
+    for (let y = 1; y < height - 1; y++) {
+        const row = y * width;
+        for (let x = 1; x < width - 1; x++) {
+            const diff = Math.abs(lum[row + x + 1] - lum[row + x - 1]);
+            if (diff > 22) mask[row + x] = 1;
+        }
+    }
+    return mask;
+}
+
+// Fecha pequenos buracos para os dígitos ou visores virarem blocos contínuos
+function dilate(mask: Uint8Array, width: number, height: number, radiusX: number, radiusY = radiusX): Uint8Array {
     const tmp = new Uint8Array(mask.length);
     const out = new Uint8Array(mask.length);
     for (let y = 0; y < height; y++) {
         let run = 0;
-        for (let x = 0; x < width + radius; x++) {
-            if (x < width && mask[y * width + x]) run = radius * 2 + 1;
+        for (let x = 0; x < width + radiusX; x++) {
+            if (x < width && mask[y * width + x]) run = radiusX * 2 + 1;
             if (run > 0) {
-                const tx = x - radius;
+                const tx = x - radiusX;
                 if (tx >= 0 && tx < width) tmp[y * width + tx] = 1;
                 run--;
             }
         }
-        // varredura reversa para cobrir o lado esquerdo
         run = 0;
-        for (let x = width - 1; x >= -radius; x--) {
-            if (x >= 0 && mask[y * width + x]) run = radius + 1;
+        for (let x = width - 1; x >= -radiusX; x--) {
+            if (x >= 0 && mask[y * width + x]) run = radiusX + 1;
             if (run > 0 && x >= 0) tmp[y * width + x] = 1;
             if (run > 0) run--;
         }
@@ -106,12 +127,12 @@ function dilate(mask: Uint8Array, width: number, height: number, radius: number)
     for (let x = 0; x < width; x++) {
         let run = 0;
         for (let y = 0; y < height; y++) {
-            if (tmp[y * width + x]) run = radius + 1;
+            if (tmp[y * width + x]) run = radiusY + 1;
             if (run > 0) { out[y * width + x] = 1; run--; }
         }
         run = 0;
         for (let y = height - 1; y >= 0; y--) {
-            if (tmp[y * width + x]) run = radius + 1;
+            if (tmp[y * width + x]) run = radiusY + 1;
             if (run > 0) { out[y * width + x] = 1; run--; }
         }
     }
@@ -145,20 +166,74 @@ function connectedBoxes(mask: Uint8Array, width: number, height: number): (Displ
     return boxes;
 }
 
+function boxesOverlap(a: DisplayBox, b: DisplayBox): boolean {
+    const x0 = Math.max(a.x, b.x), y0 = Math.max(a.y, b.y);
+    const x1 = Math.min(a.x + a.w, b.x + b.w), y1 = Math.min(a.y + a.h, b.y + b.h);
+    if (x1 <= x0 || y1 <= y0) return false;
+    const inter = (x1 - x0) * (y1 - y0);
+    const minArea = Math.min(a.w * a.h, b.w * b.h);
+    return inter / minArea > 0.4;
+}
+
 function findDisplayBoxes(img: ImageData, tolerant: boolean): DisplayBox[] {
     const { width, height } = img;
-    const raw = backlitMask(img, tolerant);
-    const radius = Math.max(1, Math.round(Math.min(width, height) / 300));
-    const mask = dilate(raw, width, height, radius);
     const minSide = Math.min(width, height);
+    const lum = luminanceMap(img);
+    const candidates: DisplayBox[] = [];
 
-    return connectedBoxes(mask, width, height)
-        .filter(b => {
+    // 1. Fundo colorido retroiluminado (típico de bombas com visor laranja/verde/azul e painéis)
+    const rawBacklit = backlitMask(img, tolerant);
+    const radius = Math.max(1, Math.round(minSide / 300));
+    const maskBacklit = dilate(rawBacklit, width, height, radius);
+    for (const b of connectedBoxes(maskBacklit, width, height)) {
+        const aspect = b.w / b.h;
+        const fill = b.count / (b.w * b.h);
+        if (b.w >= minSide * 0.06 && b.h >= minSide * 0.025 && aspect >= 1.3 && aspect <= 12 && fill >= 0.5) {
+            candidates.push({ x: b.x, y: b.y, w: b.w, h: b.h });
+        }
+    }
+
+    // 2. Traços com alto contraste horizontal (dígitos agrupados - funciona para LCD cinza e LED)
+    if (tolerant || candidates.length < 2) {
+        const rawEdges = edgeDensityMask(lum, width, height);
+        const radX = Math.max(4, Math.round(width / 55));
+        const radY = Math.max(1, Math.round(height / 280));
+        const maskEdges = dilate(rawEdges, width, height, radX, radY);
+        for (const b of connectedBoxes(maskEdges, width, height)) {
             const aspect = b.w / b.h;
             const fill = b.count / (b.w * b.h);
-            return b.w >= minSide * 0.06 && b.h >= minSide * 0.025 && aspect >= 1.3 && aspect <= 12 && fill >= 0.55;
-        })
-        .map(({ x, y, w, h }) => ({ x, y, w, h }));
+            if (b.w >= minSide * 0.08 && b.h >= minSide * 0.025 && aspect >= 1.4 && aspect <= 10 && fill >= 0.28) {
+                // Adiciona margem ligeira para não cortar os topos/bases dos dígitos
+                const padY = Math.round(b.h * 0.12);
+                const padX = Math.round(b.w * 0.04);
+                const ny = Math.max(0, b.y - padY);
+                const nx = Math.max(0, b.x - padX);
+                const nw = Math.min(width - nx, b.w + padX * 2);
+                const nh = Math.min(height - ny, b.h + padY * 2);
+                candidates.push({ x: nx, y: ny, w: nw, h: nh });
+            }
+        }
+
+        // 3. Janelas escuras (visores LED ou display em painel escuro)
+        const rawDark = darkWindowMask(lum, width, height);
+        const maskDark = dilate(rawDark, width, height, radius);
+        for (const b of connectedBoxes(maskDark, width, height)) {
+            const aspect = b.w / b.h;
+            const fill = b.count / (b.w * b.h);
+            if (b.w >= minSide * 0.07 && b.h >= minSide * 0.025 && aspect >= 1.4 && aspect <= 9 && fill >= 0.52) {
+                candidates.push({ x: b.x, y: b.y, w: b.w, h: b.h });
+            }
+        }
+    }
+
+    // Remove caixas duplicadas ou muito sobrepostas
+    const unique: DisplayBox[] = [];
+    for (const b of candidates) {
+        if (!unique.some(u => boxesOverlap(u, b))) {
+            unique.push(b);
+        }
+    }
+    return unique;
 }
 
 interface InkGrid {
@@ -167,7 +242,8 @@ interface InkGrid {
     h: number;
 }
 
-// Segmentos escuros sobre o fundo iluminado do visor
+// Extrai os segmentos (tinta) dentro da caixa, detectando automaticamente se o visor é
+// positivo (dígitos escuros em fundo claro/iluminado) ou negativo/LED (dígitos claros em fundo escuro).
 function inkInside(img: ImageData, lum: Float32Array, box: DisplayBox): InkGrid | null {
     const marginX = Math.round(box.w * 0.02), marginY = Math.round(box.h * 0.06);
     const x0 = box.x + marginX, y0 = box.y + marginY;
@@ -179,11 +255,23 @@ function inkInside(img: ImageData, lum: Float32Array, box: DisplayBox): InkGrid 
     const sorted = [...values].sort((a, b) => a - b);
     const bright = sorted[Math.floor(sorted.length * 0.85)];
     const dark = sorted[Math.floor(sorted.length * 0.05)];
-    if (bright - dark < 30) return null; // sem contraste: não há dígitos
+    if (bright - dark < 25) return null; // sem contraste: não há dígitos
     const threshold = dark + (bright - dark) * 0.5;
 
+    // Detecta polaridade: em displays 7 segmentos, os dígitos são minoria da área (15% a 45%).
+    // Se a maioria dos pixels for escura, o fundo é escuro e os dígitos são claros (display LED).
+    let darkCount = 0;
+    for (const v of values) { if (v < threshold) darkCount++; }
+    const isDarkBackground = darkCount > values.length * 0.55;
+
     const ink = new Uint8Array(w * h);
-    values.forEach((v, i) => { if (v < threshold) ink[i] = 1; });
+    if (isDarkBackground) {
+        // Dígitos claros (LED ou LCD negativo) sobre fundo escuro
+        values.forEach((v, i) => { if (v >= threshold) ink[i] = 1; });
+    } else {
+        // Dígitos escuros sobre fundo claro
+        values.forEach((v, i) => { if (v < threshold) ink[i] = 1; });
+    }
     removeBorderInk(ink, w, h);
     return { ink, w, h };
 }
@@ -368,10 +456,18 @@ export function readSevenSegmentDisplays(img: ImageData): DisplayReading[] {
         return readings;
     };
 
-    let readings = read(false);
-    // Nenhum visor confiável com 3+ dígitos: tenta de novo aceitando fundos mais apagados
-    if (!readings.some(r => r.confidence >= 0.5 && r.text.replace(/\D/g, '').length >= 3)) {
-        readings = [...readings, ...read(true)];
+    const merged = [...read(false), ...read(true)];
+    const unique: DisplayReading[] = [];
+    for (const r of merged) {
+        const existingIdx = unique.findIndex(u => boxesOverlap(u.box, r.box));
+        if (existingIdx >= 0) {
+            if (r.confidence > unique[existingIdx].confidence) {
+                unique[existingIdx] = r;
+            }
+        } else {
+            unique.push(r);
+        }
     }
-    return readings.sort((a, b) => a.box.y - b.box.y);
+    return unique.sort((a, b) => a.box.y - b.box.y);
 }
+
